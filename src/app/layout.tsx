@@ -28,6 +28,9 @@ export default function RootLayout({
               <span className="text-sm" style={{ color: 'var(--text-muted)' }}>on Monad</span>
             </a>
             <div className="flex items-center gap-4">
+              <a href="/admin" className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                ⚙️ Admin
+              </a>
               <a href="/create" className="btn-secondary text-sm" style={{ padding: '8px 16px' }}>
                 + Create Poll
               </a>

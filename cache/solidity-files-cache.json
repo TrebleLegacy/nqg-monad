@@ -2,8 +2,8 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "/Users/pedrosaragossy/Workspace/monad hacka/nqg-monad/contracts/NQGVoting.sol": {
-      "lastModificationDate": 1774202347098,
-      "contentHash": "c14722ef4691a41588d4d963092187d2",
+      "lastModificationDate": 1774208210524,
+      "contentHash": "cd918b97afd4a3d2e49000e85f358e40",
       "sourceName": "contracts/NQGVoting.sol",
       "solcConfig": {
         "version": "0.8.24",

@@ -11,6 +11,7 @@ interface Proposal {
   totalWeight: number;
   endTime: number;
   active: boolean;
+  started: boolean;
 }
 
 export default function Home() {
@@ -212,8 +213,22 @@ function ProposalCard({
   isLoggedIn: boolean;
 }) {
   const [selected, setSelected] = useState<number | null>(null);
-  const timeLeft = proposal.endTime * 1000 - Date.now();
-  const isActive = timeLeft > 0;
+  const timeLeft = proposal.started ? proposal.endTime * 1000 - Date.now() : 0;
+  const isDraft = !proposal.started;
+  const isActive = proposal.started && timeLeft > 0;
+  const isEnded = proposal.started && timeLeft <= 0;
+
+  const getStatusLabel = () => {
+    if (isDraft) return "⏸ Draft";
+    if (isActive) {
+      const h = Math.floor(timeLeft / 3600000);
+      const m = Math.floor((timeLeft % 3600000) / 60000);
+      return h > 0 ? `${h}h ${m}m left` : `${m}m left`;
+    }
+    return "Ended";
+  };
+
+  const statusClass = isDraft ? "" : isActive ? "tier-expert" : "tier-newcomer";
 
   const formatTime = (ms: number) => {
     if (ms <= 0) return "Ended";
@@ -226,10 +241,17 @@ function ProposalCard({
     <div className="glass-card p-6">
       <div className="flex justify-between items-start mb-4">
         <h3 className="text-lg font-bold flex-1">{proposal.question}</h3>
-        <span className={`text-xs px-3 py-1 rounded-full ${isActive ? "tier-expert" : "tier-newcomer"}`}>
-          {formatTime(timeLeft)}
+        <span className={`text-xs px-3 py-1 rounded-full ${statusClass}`}
+              style={isDraft ? { background: 'rgba(234,179,8,0.15)', color: '#eab308' } : {}}>
+          {getStatusLabel()}
         </span>
       </div>
+
+      {isDraft && (
+        <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+          ⏳ Waiting for admin to start voting
+        </p>
+      )}
 
       <div className="space-y-3 mb-4">
         {proposal.options.map((opt, i) => {
@@ -245,7 +267,7 @@ function ProposalCard({
                   setSelected(i);
                   if (isActive) onVote(proposal.id, i);
                 }}
-                disabled={loading || !isActive || !isLoggedIn}
+                disabled={loading || !isActive || !isLoggedIn || isDraft}
               >
                 <span>{opt}</span>
                 <span className="text-sm font-mono" style={{ color: "var(--accent-light)" }}>

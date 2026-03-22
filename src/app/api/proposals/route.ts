@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getContract, getReadContract } from "@/lib/contract";
 
-// POST /api/proposals — create or vote
+// POST /api/proposals — create, start voting, or vote
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -10,14 +10,14 @@ export async function POST(request: Request) {
     const contract = getContract();
 
     if (action === "create") {
-      const { question, options, duration, creatorAddress } = body;
+      const { question, options, duration } = body;
       if (!question || !options || options.length < 2) {
         return NextResponse.json({ error: "Question and 2+ options required" }, { status: 400 });
       }
 
       const durationSecs = duration || 3600;
       const tx = await contract.createProposal(question, options, durationSecs);
-      const receipt = await tx.wait();
+      await tx.wait();
 
       let proposalId = 0;
       try {
@@ -25,21 +25,35 @@ export async function POST(request: Request) {
         proposalId = Number(count) - 1;
       } catch { /* fallback */ }
 
-      return NextResponse.json({ proposalId, txHash: receipt?.hash });
+      return NextResponse.json({ proposalId, txHash: tx.hash, status: "draft" });
+    }
+
+    // Admin: start voting on a proposal
+    if (action === "startVoting") {
+      const { proposalId } = body;
+      if (proposalId === undefined) {
+        return NextResponse.json({ error: "proposalId required" }, { status: 400 });
+      }
+      const tx = await contract.startVoting(proposalId);
+      await tx.wait();
+      return NextResponse.json({ started: true, txHash: tx.hash });
     }
 
     if (action === "vote") {
       const { proposalId, optionIndex, voterAddress } = body;
-
       if (proposalId === undefined || optionIndex === undefined || !voterAddress) {
-        return NextResponse.json(
-          { error: "proposalId, optionIndex, and voterAddress required" },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: "proposalId, optionIndex, voterAddress required" }, { status: 400 });
       }
 
-      // Check if already voted on-chain
       const readContract = getReadContract();
+
+      // Check voter is approved
+      const [, approved] = await readContract.getVoterInfo(voterAddress);
+      if (!approved) {
+        return NextResponse.json({ error: "Not approved to vote. Admin must approve you first." }, { status: 403 });
+      }
+
+      // Check not already voted
       const voteRecord = await readContract.voteRecords(proposalId, voterAddress);
       if (voteRecord.hasVoted) {
         return NextResponse.json({ error: "Already voted on this proposal" }, { status: 409 });
@@ -48,7 +62,6 @@ export async function POST(request: Request) {
       const tx = await contract.vote(proposalId, voterAddress, optionIndex);
       const receipt = await tx.wait();
 
-      // Get updated vote power
       const votePower = await readContract.getVotePower(voterAddress);
 
       return NextResponse.json({
@@ -75,7 +88,7 @@ export async function GET() {
 
     for (let i = 0; i < Number(count); i++) {
       try {
-        const [question, endTime, optionCount, totalWeight, active] =
+        const [question, endTime, optionCount, totalWeight, active, started] =
           await contract.getProposalInfo(i);
         const options = await contract.getProposalOptions(i);
         const results = await contract.getResults(i);
@@ -88,6 +101,7 @@ export async function GET() {
           results: results.map((r: bigint) => Number(r)),
           totalWeight: Number(totalWeight),
           active,
+          started,
         });
       } catch {
         continue;
