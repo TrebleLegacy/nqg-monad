@@ -1,36 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NQG on Monad — Neural Quorum Governance
 
-## Getting Started
+> **Reputation-based anonymous voting with passkey authentication on Monad L1.**
 
-First, run the development server:
+Ported from [Stellar's Neural Quorum Governance](https://stellar.gitbook.io/scf-handbook/governance/neural-quorum-governance) — a production-proven governance mechanism used by the Stellar Community Fund since 2023.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## 🧠 What is NQG?
+
+Traditional DAO voting (1-token-1-vote) creates plutocracy. NQG fixes this with two innovations:
+
+### Neural Governance
+Your voting power comes from **reputation**, not wallet size:
+- **Tier Neuron**: Newcomer (1) → Contributor (3) → Expert (5) → Admin (8)
+- **History Neuron**: +1 per past vote, capped at 5
+- **Formula**: `votePower = tierScore + min(votesParticipated, 5)`
+
+### Quorum Delegation
+Delegate to **3-5 people**, not just one:
+- Your vote auto-follows the quorum majority
+- Reduces centralization and collusion risk
+- Solves voter fatigue without sacrificing representation
+
+### Privacy
+- Authenticate with **passkey** (fingerprint/FaceID) — no MetaMask, no seed phrase
+- Votes relayed by server hot wallet — on-chain, all votes appear from same address
+- Nobody can link your identity to your vote
+
+## 🏗️ Architecture
+
+```
+Browser (Passkey Auth)  →  Next.js API (Session + Relay)  →  Monad Chain (NQGVoting.sol)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **Auth**: WebAuthn passkeys via `@simplewebauthn`
+- **Privacy**: Server validates identity, relays votes via hot wallet
+- **On-chain**: Neural score calculated in contract, weighted votes recorded
+- **Chain**: Monad Testnet (Chain ID 10143)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🚀 Tech Stack
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Layer | Tech |
+|-------|------|
+| Frontend | Next.js 15, React, Tailwind CSS |
+| Auth | WebAuthn / Passkeys |
+| Backend | Next.js API Routes |
+| Contract | Solidity 0.8.24, Hardhat |
+| Chain | Monad Testnet (10143) |
 
-## Learn More
+## 📦 Setup
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+# Install dependencies
+npm install
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Set env vars
+cp .env.local.example .env.local
+# Edit: DEPLOYER_PRIVATE_KEY, NEXT_PUBLIC_CONTRACT_ADDRESS
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Compile contract
+npx hardhat compile --config hardhat.config.cjs
 
-## Deploy on Vercel
+# Deploy to Monad
+npx hardhat run scripts/deploy.cjs --network monad --config hardhat.config.cjs
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# Run dev server
+npm run dev
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🎯 Inspired By
+
+- [Stellar Community Fund — NQG](https://stellar.gitbook.io/scf-handbook/governance/neural-quorum-governance)
+- [BlockScience — Neural Quorum Governance Paper](https://block.science/)
+- [Monad — High-Performance EVM L1](https://monad.xyz)
+
+## 📄 License
+
+MIT
+
+---
+
+Built at **Monad Blitz São Paulo 2026** 🇧🇷
