@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: "NQG on Monad — Neural Quorum Governance",
@@ -19,22 +20,23 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       </head>
       <body style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-        <nav className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
-          <a href="/" className="flex items-center gap-2">
-            <span className="text-2xl">🧠</span>
-            <span className="text-xl font-bold gradient-text">NQG</span>
-            <span className="text-sm" style={{ color: 'var(--text-muted)' }}>on Monad</span>
-          </a>
-          <div className="flex items-center gap-4">
-            <a href="/create" className="btn-secondary text-sm" style={{ padding: '8px 16px' }}>
-              + Create Poll
+        <Providers>
+          <nav className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
+            <a href="/" className="flex items-center gap-2">
+              <span className="text-2xl">🧠</span>
+              <span className="text-xl font-bold gradient-text">NQG</span>
+              <span className="text-sm" style={{ color: 'var(--text-muted)' }}>on Monad</span>
             </a>
-            <div id="auth-status" />
-          </div>
-        </nav>
-        <main className="max-w-4xl mx-auto px-4 py-8">
-          {children}
-        </main>
+            <div className="flex items-center gap-4">
+              <a href="/create" className="btn-secondary text-sm" style={{ padding: '8px 16px' }}>
+                + Create Poll
+              </a>
+            </div>
+          </nav>
+          <main className="max-w-4xl mx-auto px-4 py-8">
+            {children}
+          </main>
+        </Providers>
       </body>
     </html>
   );

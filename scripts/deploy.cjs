@@ -1,15 +1,26 @@
-const hre = require("hardhat");
+const { ethers } = require("ethers");
+const fs = require("fs");
+const path = require("path");
+require("dotenv").config({ path: ".env.local" });
 
 async function main() {
-  const [deployer] = await hre.ethers.getSigners();
-  console.log("Deploying with:", deployer.address);
-  console.log("Balance:", (await hre.ethers.provider.getBalance(deployer.address)).toString());
+  const provider = new ethers.JsonRpcProvider("https://testnet-rpc.monad.xyz");
+  const wallet = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, provider);
+  
+  console.log("Deploying with:", wallet.address);
+  const balance = await provider.getBalance(wallet.address);
+  console.log("Balance:", ethers.formatEther(balance), "MON");
 
-  const NQGVoting = await hre.ethers.getContractFactory("NQGVoting");
-  // Relayer = deployer (same hot wallet for hackathon)
-  const contract = await NQGVoting.deploy(deployer.address);
+  // Read compiled artifact
+  const artifactPath = path.join(__dirname, "../artifacts/contracts/NQGVoting.sol/NQGVoting.json");
+  const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf8"));
+
+  const factory = new ethers.ContractFactory(artifact.abi, artifact.bytecode, wallet);
+  
+  console.log("Deploying NQGVoting...");
+  const contract = await factory.deploy(wallet.address); // relayer = deployer
   await contract.waitForDeployment();
-
+  
   const address = await contract.getAddress();
   console.log("NQGVoting deployed to:", address);
   console.log("\nUpdate .env.local:");

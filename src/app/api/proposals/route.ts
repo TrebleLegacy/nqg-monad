@@ -1,72 +1,61 @@
 import { NextResponse } from "next/server";
-import { getSession, getUser, hasVoted, markVoted } from "@/lib/store";
 import { getContract, getReadContract } from "@/lib/contract";
 
 // POST /api/proposals — create or vote
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { action, sessionId } = body;
-
-    // Validate session
-    const session = getSession(sessionId);
-    if (!session) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
-
-    const user = getUser(session.userId);
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+    const { action } = body;
 
     const contract = getContract();
 
     if (action === "create") {
-      const { question, options, duration } = body;
+      const { question, options, duration, creatorAddress } = body;
       if (!question || !options || options.length < 2) {
         return NextResponse.json({ error: "Question and 2+ options required" }, { status: 400 });
       }
 
-      const durationSecs = (duration || 3600); // default 1 hour
+      const durationSecs = duration || 3600;
       const tx = await contract.createProposal(question, options, durationSecs);
       const receipt = await tx.wait();
-      
-      // Get proposal ID from event
-      const event = receipt?.logs?.[0];
+
       let proposalId = 0;
-      if (event) {
-        try {
-          const iface = contract.interface;
-          const parsed = iface.parseLog({ topics: event.topics as string[], data: event.data });
-          proposalId = Number(parsed?.args?.[0] || 0);
-        } catch {
-          // Fallback: read proposalCount
-          const count = await contract.proposalCount();
-          proposalId = Number(count) - 1;
-        }
-      }
+      try {
+        const count = await contract.proposalCount();
+        proposalId = Number(count) - 1;
+      } catch { /* fallback */ }
 
       return NextResponse.json({ proposalId, txHash: receipt?.hash });
     }
 
     if (action === "vote") {
-      const { proposalId, optionIndex } = body;
-      
-      if (proposalId === undefined || optionIndex === undefined) {
-        return NextResponse.json({ error: "proposalId and optionIndex required" }, { status: 400 });
+      const { proposalId, optionIndex, voterAddress } = body;
+
+      if (proposalId === undefined || optionIndex === undefined || !voterAddress) {
+        return NextResponse.json(
+          { error: "proposalId, optionIndex, and voterAddress required" },
+          { status: 400 }
+        );
       }
 
-      // Anti-double-vote (server-side)
-      if (hasVoted(proposalId, user.id)) {
-        return NextResponse.json({ error: "Already voted" }, { status: 409 });
+      // Check if already voted on-chain
+      const readContract = getReadContract();
+      const voteRecord = await readContract.voteRecords(proposalId, voterAddress);
+      if (voteRecord.hasVoted) {
+        return NextResponse.json({ error: "Already voted on this proposal" }, { status: 409 });
       }
 
-      const tx = await contract.vote(proposalId, user.evmAddress, optionIndex);
+      const tx = await contract.vote(proposalId, voterAddress, optionIndex);
       const receipt = await tx.wait();
-      
-      markVoted(proposalId, user.id);
 
-      return NextResponse.json({ txHash: receipt?.hash, optionIndex });
+      // Get updated vote power
+      const votePower = await readContract.getVotePower(voterAddress);
+
+      return NextResponse.json({
+        txHash: receipt?.hash,
+        optionIndex,
+        weight: Number(votePower),
+      });
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
@@ -86,7 +75,7 @@ export async function GET() {
 
     for (let i = 0; i < Number(count); i++) {
       try {
-        const [question, endTime, optionCount, totalWeight, active] = 
+        const [question, endTime, optionCount, totalWeight, active] =
           await contract.getProposalInfo(i);
         const options = await contract.getProposalOptions(i);
         const results = await contract.getResults(i);
