@@ -1,14 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
+
+function toDatetimeLocalValue(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 export default function CreateProposal() {
   const { login, authenticated } = usePrivy();
   const { wallets } = useWallets();
   const [question, setQuestion] = useState("");
   const [options, setOptions] = useState(["", ""]);
-  const [duration, setDuration] = useState(3600);
+  const [openTime, setOpenTime] = useState("");
+  const [closeTime, setCloseTime] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{
     proposalId?: number;
@@ -19,6 +25,14 @@ export default function CreateProposal() {
   } | null>(null);
 
   const walletAddress = wallets?.[0]?.address;
+
+  useEffect(() => {
+    const now = Date.now();
+    const open = new Date(now + 5 * 60 * 1000);
+    const close = new Date(now + 10 * 60 * 1000);
+    setOpenTime(toDatetimeLocalValue(open));
+    setCloseTime(toDatetimeLocalValue(close));
+  }, []);
 
   const addOption = () => {
     if (options.length < 10) setOptions([...options, ""]);
@@ -36,6 +50,25 @@ export default function CreateProposal() {
     const validOptions = options.filter((o) => o.trim());
     if (!question.trim() || validOptions.length < 2) {
       setResult({ error: "Question and at least 2 options required" });
+      return;
+    }
+    if (!openTime || !closeTime) {
+      setResult({ error: "Voting open and close times required" });
+      return;
+    }
+    const open = new Date(openTime);
+    const close = new Date(closeTime);
+    if (Number.isNaN(open.getTime()) || Number.isNaN(close.getTime())) {
+      setResult({ error: "Invalid date/time" });
+      return;
+    }
+    if (close <= open) {
+      setResult({ error: "Voting must close after it opens" });
+      return;
+    }
+    const duration = Math.floor((close.getTime() - open.getTime()) / 1000);
+    if (duration < 60) {
+      setResult({ error: "Voting window must be at least 1 minute" });
       return;
     }
 
@@ -112,7 +145,10 @@ export default function CreateProposal() {
 
   return (
     <div className="max-w-lg mx-auto fade-in">
-      <h1 className="text-3xl font-bold mb-6 gradient-text">Create Proposal</h1>
+      <h1 className="text-3xl font-bold mb-2 gradient-text">Create Proposal1</h1>
+      <p className="text-sm mb-6" style={{ color: "var(--text-muted)" }}>
+        Voting length is the time between open and close below (after an admin starts the poll on-chain).
+      </p>
 
       <div className="glass-card p-6" style={{ cursor: "default" }}>
         <div className="mb-4">
@@ -151,15 +187,24 @@ export default function CreateProposal() {
           )}
         </div>
 
+        <div className="mb-4">
+          <label className="block text-sm font-semibold mb-2">Voting opens (local time)</label>
+          <input
+            type="datetime-local"
+            className="input-dark"
+            value={openTime}
+            onChange={(e) => setOpenTime(e.target.value)}
+          />
+        </div>
+
         <div className="mb-6">
-          <label className="block text-sm font-semibold mb-2">Duration</label>
-          <select className="input-dark" value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
-            <option value={300}>5 minutes</option>
-            <option value={900}>15 minutes</option>
-            <option value={1800}>30 minutes</option>
-            <option value={3600}>1 hour</option>
-            <option value={86400}>24 hours</option>
-          </select>
+          <label className="block text-sm font-semibold mb-2">Voting closes (local time)</label>
+          <input
+            type="datetime-local"
+            className="input-dark"
+            value={closeTime}
+            onChange={(e) => setCloseTime(e.target.value)}
+          />
         </div>
 
         {result?.error && (
