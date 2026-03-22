@@ -1,14 +1,58 @@
 import { NextResponse } from "next/server";
 import { getSession, getUser, hasVoted, markVoted } from "@/lib/store";
 import { getContract, getReadContract } from "@/lib/contract";
+import { assertAdminSecret } from "@/lib/adminAuth";
 
-// POST /api/proposals — create or vote
+// POST /api/proposals — create (admin) or vote
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { action, sessionId } = body;
 
-    // Validate session
+    const contract = getContract();
+
+    if (action === "create") {
+      assertAdminSecret(body.adminSecret);
+
+      const { question, options, startTime, endTime } = body;
+      if (!question || !options || options.length < 2) {
+        return NextResponse.json({ error: "Question and 2+ options required" }, { status: 400 });
+      }
+      if (startTime === undefined || endTime === undefined) {
+        return NextResponse.json({ error: "startTime and endTime (unix seconds) required" }, { status: 400 });
+      }
+
+      const start = BigInt(startTime);
+      const end = BigInt(endTime);
+      const tx = await contract.createProposal(question.trim(), options, start, end);
+      const receipt = await tx.wait();
+
+      let proposalId = 0;
+      if (receipt?.logs?.length) {
+        for (const log of receipt.logs) {
+          try {
+            const parsed = contract.interface.parseLog({
+              topics: log.topics as string[],
+              data: log.data,
+            });
+            if (parsed?.name === "ProposalCreated") {
+              proposalId = Number(parsed.args[0]);
+              break;
+            }
+          } catch {
+            /* next log */
+          }
+        }
+      }
+      if (proposalId === 0) {
+        const count = await contract.proposalCount();
+        proposalId = Number(count) - 1;
+      }
+
+      return NextResponse.json({ proposalId, txHash: receipt?.hash });
+    }
+
+    // vote requires session
     const session = getSession(sessionId);
     if (!session) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -19,51 +63,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const contract = getContract();
-
-    if (action === "create") {
-      const { question, options, duration } = body;
-      if (!question || !options || options.length < 2) {
-        return NextResponse.json({ error: "Question and 2+ options required" }, { status: 400 });
-      }
-
-      const durationSecs = (duration || 3600); // default 1 hour
-      const tx = await contract.createProposal(question, options, durationSecs);
-      const receipt = await tx.wait();
-      
-      // Get proposal ID from event
-      const event = receipt?.logs?.[0];
-      let proposalId = 0;
-      if (event) {
-        try {
-          const iface = contract.interface;
-          const parsed = iface.parseLog({ topics: event.topics as string[], data: event.data });
-          proposalId = Number(parsed?.args?.[0] || 0);
-        } catch {
-          // Fallback: read proposalCount
-          const count = await contract.proposalCount();
-          proposalId = Number(count) - 1;
-        }
-      }
-
-      return NextResponse.json({ proposalId, txHash: receipt?.hash });
-    }
-
     if (action === "vote") {
       const { proposalId, optionIndex } = body;
-      
+
       if (proposalId === undefined || optionIndex === undefined) {
         return NextResponse.json({ error: "proposalId and optionIndex required" }, { status: 400 });
       }
 
-      // Anti-double-vote (server-side)
       if (hasVoted(proposalId, user.id)) {
         return NextResponse.json({ error: "Already voted" }, { status: 409 });
       }
 
       const tx = await contract.vote(proposalId, user.evmAddress, optionIndex);
       const receipt = await tx.wait();
-      
+
       markVoted(proposalId, user.id);
 
       return NextResponse.json({ txHash: receipt?.hash, optionIndex });
@@ -73,7 +86,8 @@ export async function POST(request: Request) {
   } catch (error: unknown) {
     console.error("Proposal action error:", error);
     const message = error instanceof Error ? error.message : "Internal error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const status = message === "Unauthorized" ? 401 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }
 
@@ -86,7 +100,7 @@ export async function GET() {
 
     for (let i = 0; i < Number(count); i++) {
       try {
-        const [question, endTime, optionCount, totalWeight, active] = 
+        const [question, startTime, endTime, , totalWeight, votingOpen] =
           await contract.getProposalInfo(i);
         const options = await contract.getProposalOptions(i);
         const results = await contract.getResults(i);
@@ -94,11 +108,12 @@ export async function GET() {
         proposals.push({
           id: i,
           question,
+          startTime: Number(startTime),
           endTime: Number(endTime),
           options,
           results: results.map((r: bigint) => Number(r)),
           totalWeight: Number(totalWeight),
-          active,
+          active: votingOpen,
         });
       } catch {
         continue;

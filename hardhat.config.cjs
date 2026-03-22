@@ -1,4 +1,8 @@
-require("dotenv").config({ path: ".env.local" });
+const path = require("path");
+// Load from project root (next to this file), not cwd; try .env then .env.local
+require("dotenv").config({ path: path.join(__dirname, ".env") });
+require("dotenv").config({ path: path.join(__dirname, ".env.local"), override: true });
+require("@nomicfoundation/hardhat-ethers");
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {

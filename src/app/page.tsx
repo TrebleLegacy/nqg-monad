@@ -9,6 +9,7 @@ interface Proposal {
   options: string[];
   results: number[];
   totalWeight: number;
+  startTime: number;
   endTime: number;
   active: boolean;
 }
@@ -155,7 +156,7 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      showToast("Vote cast! Weight applied by your reputation 🧠");
+      showToast("Vote cast!");
       fetchProposals();
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : "Vote failed", "error");
@@ -168,9 +169,6 @@ export default function Home() {
     localStorage.removeItem("nqg_user");
   };
 
-  const tierLabels = ["Newcomer", "Contributor", "Expert", "Admin"];
-  const tierClasses = ["tier-newcomer", "tier-contributor", "tier-expert", "tier-admin"];
-
   return (
     <div className="fade-in">
       {/* Hero */}
@@ -181,10 +179,10 @@ export default function Home() {
           <span style={{ color: 'var(--text-primary)' }}>Governance</span>
         </h1>
         <p className="text-lg mb-2" style={{ color: 'var(--text-secondary)' }}>
-          Voting power from <strong>reputation</strong>, not tokens. Delegate to a <strong>quorum</strong>, not one person.
+          One <strong>admin</strong> approves voters, assigns vote weights, and schedules each poll&apos;s open/close window.
         </p>
         <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
-          Authenticate with passkey (biometrics). Vote anonymously on-chain on Monad.
+          Sign in with a passkey. Votes are relayed on-chain on Monad for privacy.
         </p>
 
         {!user ? (
@@ -211,34 +209,29 @@ export default function Home() {
 
       {/* How It Works */}
       <section className="glass-card p-6 mb-8" style={{ cursor: 'default' }}>
-        <h2 className="text-lg font-bold mb-4 gradient-text">How Neural Governance Works</h2>
+        <h2 className="text-lg font-bold mb-4 gradient-text">How it works</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="text-center">
-            <div className="neuron-node mx-auto mb-2" style={{ background: 'var(--bg-secondary)' }}>🏷️</div>
-            <h3 className="font-semibold text-sm">Reputation Tier</h3>
+            <div className="neuron-node mx-auto mb-2" style={{ background: 'var(--bg-secondary)' }}>✅</div>
+            <h3 className="font-semibold text-sm">Admin approval</h3>
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              Newcomer (1) → Contributor (3) → Expert (5) → Admin (8)
+              After you register, the admin must approve your address before you can vote.
             </p>
           </div>
           <div className="text-center">
-            <div className="neuron-node mx-auto mb-2" style={{ background: 'var(--bg-secondary)' }}>📊</div>
-            <h3 className="font-semibold text-sm">Voting History</h3>
+            <div className="neuron-node mx-auto mb-2" style={{ background: 'var(--bg-secondary)' }}>⚖️</div>
+            <h3 className="font-semibold text-sm">Your weight</h3>
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              +1 per past vote, up to 5. Consistent voters gain power.
+              The admin sets your vote power. It must be greater than zero to count.
             </p>
           </div>
           <div className="text-center">
-            <div className="neuron-node mx-auto mb-2" style={{ background: 'var(--bg-secondary)' }}>👥</div>
-            <h3 className="font-semibold text-sm">Quorum Delegation</h3>
+            <div className="neuron-node mx-auto mb-2" style={{ background: 'var(--bg-secondary)' }}>🕐</div>
+            <h3 className="font-semibold text-sm">Poll schedule</h3>
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              Delegate to 3-5 people. Your vote follows the majority.
+              Only the admin creates polls and chooses when voting opens and closes.
             </p>
           </div>
-        </div>
-        <div className="mt-4 text-center">
-          <code className="text-sm px-4 py-2 rounded-lg inline-block" style={{ background: 'var(--bg-secondary)', color: 'var(--accent-light)' }}>
-            votePower = tierScore + min(votesParticipated, 5)
-          </code>
         </div>
       </section>
 
@@ -247,14 +240,14 @@ export default function Home() {
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Active Proposals</h2>
           <a href="/create" className="btn-glow text-sm" style={{ padding: '8px 16px' }}>
-            + New Proposal
+            + Admin: new poll
           </a>
         </div>
 
         {proposals.length === 0 ? (
           <div className="glass-card p-8 text-center" style={{ cursor: 'default' }}>
             <p className="text-3xl mb-2">🗳️</p>
-            <p style={{ color: 'var(--text-secondary)' }}>No proposals yet. Create the first one!</p>
+            <p style={{ color: 'var(--text-secondary)' }}>No proposals yet. An admin can schedule one from the link above.</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -359,15 +352,23 @@ function ProposalCard({
   isLoggedIn: boolean;
 }) {
   const [selected, setSelected] = useState<number | null>(null);
-  const maxVotes = Math.max(...proposal.results, 1);
-  const timeLeft = proposal.endTime * 1000 - Date.now();
-  const isActive = timeLeft > 0;
+  const now = Date.now();
+  const startMs = proposal.startTime * 1000;
+  const endMs = proposal.endTime * 1000;
+  const notYetOpen = now < startMs;
+  const ended = now >= endMs;
+  const isActive = proposal.active;
 
-  const formatTime = (ms: number) => {
-    if (ms <= 0) return "Ended";
+  const formatDuration = (ms: number) => {
     const h = Math.floor(ms / 3600000);
     const m = Math.floor((ms % 3600000) / 60000);
-    return h > 0 ? `${h}h ${m}m left` : `${m}m left`;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  };
+
+  const statusBadge = () => {
+    if (notYetOpen) return `Opens in ${formatDuration(startMs - now)}`;
+    if (ended) return "Ended";
+    return `${formatDuration(endMs - now)} left`;
   };
 
   return (
@@ -375,7 +376,7 @@ function ProposalCard({
       <div className="flex justify-between items-start mb-4">
         <h3 className="text-lg font-bold flex-1">{proposal.question}</h3>
         <span className={`text-xs px-3 py-1 rounded-full ${isActive ? 'tier-expert' : 'tier-newcomer'}`}>
-          {formatTime(timeLeft)}
+          {statusBadge()}
         </span>
       </div>
 
@@ -391,6 +392,7 @@ function ProposalCard({
                 className={`vote-option flex justify-between items-center ${selected === i ? "selected" : ""}`}
                 onClick={() => { setSelected(i); if (isActive) onVote(proposal.id, i); }}
                 disabled={loading || !isActive || !isLoggedIn}
+                title={notYetOpen ? "Voting has not opened yet" : ended ? "Voting has closed" : undefined}
               >
                 <span>{opt}</span>
                 <span className="text-sm font-mono" style={{ color: 'var(--accent-light)' }}>

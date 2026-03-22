@@ -1,7 +1,13 @@
 const hre = require("hardhat");
 
 async function main() {
-  const [deployer] = await hre.ethers.getSigners();
+  const signers = await hre.ethers.getSigners();
+  if (signers.length === 0) {
+    throw new Error(
+      "No deployer account: set DEPLOYER_PRIVATE_KEY in .env.local or .env (project root). Copy .env.example if needed."
+    );
+  }
+  const deployer = signers[0];
   console.log("Deploying with:", deployer.address);
   console.log("Balance:", (await hre.ethers.provider.getBalance(deployer.address)).toString());
 

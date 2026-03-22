@@ -2,21 +2,20 @@ import { ethers } from "ethers";
 
 const ABI = [
   "function registerVoter(address) external",
-  "function setVoterTier(address, uint8) external",
-  "function createProposal(string, string[], uint256) external returns (uint256)",
-  "function vote(uint256, address, uint256) external",
-  "function setQuorumDelegates(address, address[]) external",
-  "function resolveQuorumVote(uint256, address) external",
+  "function approveVoter(address) external",
+  "function setVotePower(address,uint256) external",
+  "function createProposal(string,string[],uint256,uint256) external returns (uint256)",
+  "function setProposalWindow(uint256,uint256,uint256) external",
+  "function vote(uint256,address,uint256) external",
   "function getVotePower(address) view returns (uint256)",
   "function getResults(uint256) view returns (uint256[])",
   "function getProposalOptions(uint256) view returns (string[])",
-  "function getProposalInfo(uint256) view returns (string, uint256, uint256, uint256, bool)",
-  "function getVoterInfo(address) view returns (bool, uint256, uint256, uint256, uint256)",
-  "function getQuorumDelegates(address) view returns (address[])",
+  "function getProposalInfo(uint256) view returns (string,uint256,uint256,uint256,uint256,bool)",
+  "function getVoterInfo(address) view returns (bool,bool,uint256)",
   "function proposalCount() view returns (uint256)",
-  "event ProposalCreated(uint256 indexed proposalId, string question, uint256 endTime)",
+  "function admin() view returns (address)",
+  "event ProposalCreated(uint256 indexed proposalId, string question, uint256 startTime, uint256 endTime)",
   "event VoteCast(uint256 indexed proposalId, uint256 optionIndex, uint256 weight)",
-  "event QuorumVoteResolved(uint256 indexed proposalId, address indexed voter, uint256 optionIndex, uint256 weight)",
 ];
 
 const provider = new ethers.JsonRpcProvider(

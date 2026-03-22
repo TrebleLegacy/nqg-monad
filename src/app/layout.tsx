@@ -27,7 +27,7 @@ export default function RootLayout({
           </a>
           <div className="flex items-center gap-4">
             <a href="/create" className="btn-secondary text-sm" style={{ padding: '8px 16px' }}>
-              + Create Poll
+              + Admin: poll
             </a>
             <div id="auth-status" />
           </div>
