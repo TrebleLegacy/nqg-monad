@@ -237,7 +237,6 @@ function ProposalCard({
   const timeLeft = proposal.started ? proposal.endTime * 1000 - Date.now() : 0;
   const isDraft = !proposal.started;
   const isActive = proposal.started && timeLeft > 0;
-  const isEnded = proposal.started && timeLeft <= 0;
 
   const getStatusLabel = () => {
     if (isDraft) return "⏸ Draft";
@@ -251,12 +250,6 @@ function ProposalCard({
 
   const statusClass = isDraft ? "" : isActive ? "tier-expert" : "tier-newcomer";
 
-  const formatTime = (ms: number) => {
-    if (ms <= 0) return "Ended";
-    const h = Math.floor(ms / 3600000);
-    const m = Math.floor((ms % 3600000) / 60000);
-    return h > 0 ? `${h}h ${m}m left` : `${m}m left`;
-  };
 
   return (
     <div className="glass-card p-6">

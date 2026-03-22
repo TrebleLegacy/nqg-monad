@@ -145,7 +145,7 @@ export default function CreateProposal() {
 
   return (
     <div className="max-w-lg mx-auto fade-in">
-      <h1 className="text-3xl font-bold mb-2 gradient-text">Create Proposal1</h1>
+      <h1 className="text-3xl font-bold mb-2 gradient-text">Create Proposal</h1>
       <p className="text-sm mb-6" style={{ color: "var(--text-muted)" }}>
         Voting length is the time between open and close below (after an admin starts the poll on-chain).
       </p>

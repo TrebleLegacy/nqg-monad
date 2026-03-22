@@ -28,7 +28,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
         appearance: {
           theme: "dark",
           accentColor: "#7c3aed",
-          logo: "https://i.imgur.com/placeholder.png",
           showWalletLoginFirst: false,
         },
         embeddedWallets: {
