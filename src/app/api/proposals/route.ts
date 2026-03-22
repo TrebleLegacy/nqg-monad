@@ -75,34 +75,41 @@ export async function POST(request: Request) {
     }
 
     if (action === "vote") {
-      const { proposalId, optionIndex, voterAddress } = body;
-      if (proposalId === undefined || optionIndex === undefined || !voterAddress) {
-        return NextResponse.json({ error: "proposalId, optionIndex, voterAddress required" }, { status: 400 });
+      const { proposalId, optionIndex, voterAddress, userId } = body;
+      if (proposalId === undefined || optionIndex === undefined) {
+        return NextResponse.json({ error: "proposalId and optionIndex required" }, { status: 400 });
+      }
+
+      // Use wallet address if available, otherwise derive from userId
+      const { ethers } = await import("ethers");
+      const address = voterAddress || (userId ? ethers.computeAddress(ethers.id(userId)) : null);
+      if (!address) {
+        return NextResponse.json({ error: "Login required" }, { status: 401 });
       }
 
       const readContract = getReadContract();
 
       // Auto-register + auto-approve if needed (seamless flow)
-      const [registered, approved] = await readContract.getVoterInfo(voterAddress);
+      const [registered, approved] = await readContract.getVoterInfo(address);
       if (!registered) {
-        const regTx = await contract.registerVoter(voterAddress);
+        const regTx = await contract.registerVoter(address);
         await regTx.wait();
       }
       if (!approved) {
-        const appTx = await contract.approveVoter(voterAddress, 0); // Newcomer
+        const appTx = await contract.approveVoter(address, 0); // Newcomer
         await appTx.wait();
       }
 
       // Check not already voted
-      const voteRecord = await readContract.voteRecords(proposalId, voterAddress);
+      const voteRecord = await readContract.voteRecords(proposalId, address);
       if (voteRecord.hasVoted) {
         return NextResponse.json({ error: "Already voted on this proposal" }, { status: 409 });
       }
 
-      const tx = await contract.vote(proposalId, voterAddress, optionIndex);
+      const tx = await contract.vote(proposalId, address, optionIndex);
       const receipt = await tx.wait();
 
-      const votePower = await readContract.getVotePower(voterAddress);
+      const votePower = await readContract.getVotePower(address);
 
       return NextResponse.json({
         txHash: receipt?.hash,

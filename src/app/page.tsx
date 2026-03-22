@@ -44,35 +44,9 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [fetchProposals]);
 
-  // Voter address: embedded wallet > privy wallet > deterministic from user ID
-  // Server relay signs all txs — voterAddress is just an on-chain identifier
-  const voterAddress = walletAddress || user?.wallet?.address || (
-    user?.id
-      ? "0x" + Array.from(user.id).reduce((acc, c) => {
-          const h = ((acc << 5) - acc + c.charCodeAt(0)) >>> 0;
-          return h;
-        }, 0).toString(16).padStart(40, "0").slice(0, 40)
-      : null
-  );
-
-  // Register voter on-chain when user connects
-  useEffect(() => {
-    if (voterAddress && authenticated) {
-      fetch("/api/voters", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "register", address: voterAddress }),
-      }).catch(() => {});
-    }
-  }, [voterAddress, authenticated]);
-
   const handleVote = async (proposalId: number, optionIndex: number) => {
-    if (!authenticated) {
+    if (!authenticated || !user) {
       try { await loginWithPasskey(); } catch { /* user cancelled */ }
-      return;
-    }
-    if (!voterAddress) {
-      showToast("No wallet address found. Try logging out and back in.", "error");
       return;
     }
     setLoading(true);
@@ -82,7 +56,8 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "vote",
-          voterAddress,
+          userId: user.id,
+          voterAddress: walletAddress || user?.wallet?.address || null,
           proposalId,
           optionIndex,
         }),
