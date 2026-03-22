@@ -89,6 +89,23 @@ export default function Home() {
     setLoading(false);
   };
 
+  const handleDelete = async (proposalId: number) => {
+    if (!confirm("Delete this proposal?")) return;
+    try {
+      const res = await fetch("/api/proposals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", proposalId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      showToast("Proposal deleted");
+      fetchProposals();
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : "Delete failed", "error");
+    }
+  };
+
   if (!ready) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -207,6 +224,7 @@ export default function Home() {
                 key={p.id}
                 proposal={p}
                 onVote={handleVote}
+                onDelete={handleDelete}
                 loading={loading}
                 isLoggedIn={authenticated}
               />
@@ -228,11 +246,13 @@ export default function Home() {
 function ProposalCard({
   proposal,
   onVote,
+  onDelete,
   loading,
   isLoggedIn,
 }: {
   proposal: Proposal;
   onVote: (proposalId: number, optionIndex: number) => void;
+  onDelete: (proposalId: number) => void;
   loading: boolean;
   isLoggedIn: boolean;
 }) {
@@ -289,9 +309,19 @@ function ProposalCard({
         })}
       </div>
 
-      <div className="flex justify-between text-xs" style={{ color: "var(--text-muted)" }}>
+      <div className="flex justify-between items-center text-xs" style={{ color: "var(--text-muted)" }}>
         <span>Total weight: {proposal.totalWeight}</span>
-        <span>Proposal #{proposal.id}</span>
+        <div className="flex items-center gap-3">
+          <span>Proposal #{proposal.id}</span>
+          <button
+            onClick={() => onDelete(proposal.id)}
+            className="text-xs px-2 py-1 rounded hover:bg-red-500/20 transition-colors"
+            style={{ color: "#ef4444" }}
+            title="Delete proposal"
+          >
+            🗑️
+          </button>
+        </div>
       </div>
     </div>
   );

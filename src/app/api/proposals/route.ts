@@ -5,6 +5,7 @@ import { pinProposalToIPFS } from "@/lib/pinata";
 // In-memory IPFS hash store (proposalId → CID)
 // Survives HMR but not full restarts — acceptable for hackathon
 const ipfsHashes = new Map<number, { cid: string; url: string }>();
+const hiddenProposals = new Set<number>();
 
 // POST /api/proposals — create, start voting, or vote
 export async function POST(request: Request) {
@@ -110,6 +111,16 @@ export async function POST(request: Request) {
       });
     }
 
+    // Soft-delete: hide proposal from listing
+    if (action === "delete") {
+      const { proposalId } = body;
+      if (proposalId === undefined) {
+        return NextResponse.json({ error: "proposalId required" }, { status: 400 });
+      }
+      hiddenProposals.add(Number(proposalId));
+      return NextResponse.json({ deleted: true, proposalId: Number(proposalId) });
+    }
+
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   } catch (error: unknown) {
     console.error("Proposal action error:", error);
@@ -126,6 +137,7 @@ export async function GET() {
     const proposals = [];
 
     for (let i = 0; i < Number(count); i++) {
+      if (hiddenProposals.has(i)) continue;
       try {
         const [question, endTime, optionCount, totalWeight, active, started] =
           await contract.getProposalInfo(i);
