@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { usePrivy, useWallets, useLoginWithPasskey, useSignupWithPasskey } from "@privy-io/react-auth";
 
 interface Proposal {
   id: number;
@@ -15,8 +15,10 @@ interface Proposal {
 }
 
 export default function Home() {
-  const { login, logout, authenticated, user, ready } = usePrivy();
+  const { logout, authenticated, user, ready } = usePrivy();
   const { wallets } = useWallets();
+  const { signupWithPasskey, state: signupState } = useSignupWithPasskey();
+  const { loginWithPasskey, state: loginState } = useLoginWithPasskey();
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
@@ -55,7 +57,7 @@ export default function Home() {
 
   const handleVote = async (proposalId: number, optionIndex: number) => {
     if (!authenticated) {
-      login();
+      try { await loginWithPasskey(); } catch { /* user cancelled */ }
       return;
     }
     if (!walletAddress) {
@@ -109,14 +111,33 @@ export default function Home() {
         </p>
 
         {!authenticated ? (
-          <button className="btn-glow" onClick={login}>
-            🔐 Login with Passkey
-          </button>
+          <div className="flex gap-3 justify-center">
+            <button
+              className="btn-glow"
+              onClick={() => signupWithPasskey().catch(() => {})}
+              disabled={signupState.status !== "initial"}
+            >
+              {signupState.status !== "initial" ? (
+                <span className="flex items-center gap-2"><span className="spinner" style={{width:16,height:16}} /> Creating...</span>
+              ) : "🔐 Create Passkey"}
+            </button>
+            <button
+              className="btn-secondary"
+              style={{ padding: "12px 24px" }}
+              onClick={() => loginWithPasskey().catch(() => {})}
+              disabled={loginState.status !== "initial"}
+            >
+              {loginState.status !== "initial" ? (
+                <span className="flex items-center gap-2"><span className="spinner" style={{width:16,height:16}} /> Signing in...</span>
+              ) : "👆 Login with Passkey"}
+            </button>
+          </div>
         ) : (
           <div className="flex items-center justify-center gap-4">
             <span className="tier-badge tier-newcomer">
-              🧠 {user?.email?.address || user?.wallet?.address?.slice(0, 8) + "..." || "Connected"}
+              🧠 {user?.wallet?.address?.slice(0, 8) + "..." || "Connected"}
             </span>
+
             {walletAddress && (
               <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
                 {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
