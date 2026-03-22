@@ -44,8 +44,16 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [fetchProposals]);
 
-  // Use embedded wallet address from Privy (created on login via passkey)
-  const voterAddress = walletAddress || user?.wallet?.address;
+  // Voter address: embedded wallet > privy wallet > deterministic from user ID
+  // Server relay signs all txs — voterAddress is just an on-chain identifier
+  const voterAddress = walletAddress || user?.wallet?.address || (
+    user?.id
+      ? "0x" + Array.from(user.id).reduce((acc, c) => {
+          const h = ((acc << 5) - acc + c.charCodeAt(0)) >>> 0;
+          return h;
+        }, 0).toString(16).padStart(40, "0").slice(0, 40)
+      : null
+  );
 
   // Register voter on-chain when user connects
   useEffect(() => {
