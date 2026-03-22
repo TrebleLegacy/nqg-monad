@@ -44,24 +44,27 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [fetchProposals]);
 
+  // Use embedded wallet address from Privy (created on login via passkey)
+  const voterAddress = walletAddress || user?.wallet?.address;
+
   // Register voter on-chain when user connects
   useEffect(() => {
-    if (walletAddress && authenticated) {
+    if (voterAddress && authenticated) {
       fetch("/api/voters", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "register", address: walletAddress }),
+        body: JSON.stringify({ action: "register", address: voterAddress }),
       }).catch(() => {});
     }
-  }, [walletAddress, authenticated]);
+  }, [voterAddress, authenticated]);
 
   const handleVote = async (proposalId: number, optionIndex: number) => {
     if (!authenticated) {
       try { await loginWithPasskey(); } catch { /* user cancelled */ }
       return;
     }
-    if (!walletAddress) {
-      showToast("Connecting wallet...", "error");
+    if (!voterAddress) {
+      showToast("No wallet address found. Try logging out and back in.", "error");
       return;
     }
     setLoading(true);
@@ -71,7 +74,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "vote",
-          voterAddress: walletAddress,
+          voterAddress,
           proposalId,
           optionIndex,
         }),
@@ -234,12 +237,10 @@ function ProposalCard({
   isLoggedIn: boolean;
 }) {
   const [selected, setSelected] = useState<number | null>(null);
-  const timeLeft = proposal.started ? proposal.endTime * 1000 - Date.now() : 0;
-  const isDraft = !proposal.started;
-  const isActive = proposal.started && timeLeft > 0;
+  const timeLeft = proposal.endTime * 1000 - Date.now();
+  const isActive = timeLeft > 0;
 
   const getStatusLabel = () => {
-    if (isDraft) return "⏸ Draft";
     if (isActive) {
       const h = Math.floor(timeLeft / 3600000);
       const m = Math.floor((timeLeft % 3600000) / 60000);
@@ -248,24 +249,16 @@ function ProposalCard({
     return "Ended";
   };
 
-  const statusClass = isDraft ? "" : isActive ? "tier-expert" : "tier-newcomer";
-
+  const statusClass = isActive ? "tier-expert" : "tier-newcomer";
 
   return (
     <div className="glass-card p-6">
       <div className="flex justify-between items-start mb-4">
         <h3 className="text-lg font-bold flex-1">{proposal.question}</h3>
-        <span className={`text-xs px-3 py-1 rounded-full ${statusClass}`}
-              style={isDraft ? { background: 'rgba(234,179,8,0.15)', color: '#eab308' } : {}}>
+        <span className={`text-xs px-3 py-1 rounded-full ${statusClass}`}>
           {getStatusLabel()}
         </span>
       </div>
-
-      {isDraft && (
-        <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
-          ⏳ Waiting for admin to start voting
-        </p>
-      )}
 
       <div className="space-y-3 mb-4">
         {proposal.options.map((opt, i) => {
@@ -281,7 +274,7 @@ function ProposalCard({
                   setSelected(i);
                   if (isActive) onVote(proposal.id, i);
                 }}
-                disabled={loading || !isActive || !isLoggedIn || isDraft}
+                disabled={loading || !isActive || !isLoggedIn}
               >
                 <span>{opt}</span>
                 <span className="text-sm font-mono" style={{ color: "var(--accent-light)" }}>

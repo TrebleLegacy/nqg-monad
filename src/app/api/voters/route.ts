@@ -14,15 +14,28 @@ export async function POST(request: Request) {
     const contract = getContract();
     const readContract = getReadContract();
 
-    // Self-register (pending admin approval)
+    // Self-register + auto-approve as Newcomer (hackathon mode)
     if (action === "register") {
       try {
-        const [registered] = await readContract.getVoterInfo(address);
-        if (registered) return NextResponse.json({ already: true });
+        const [registered, approved] = await readContract.getVoterInfo(address);
+        if (registered && approved) return NextResponse.json({ already: true });
 
-        const tx = await contract.registerVoter(address);
-        await tx.wait();
-        return NextResponse.json({ registered: true, txHash: tx.hash });
+        if (!registered) {
+          const tx = await contract.registerVoter(address);
+          await tx.wait();
+        }
+
+        // Auto-approve as Newcomer (tier 0) so user can vote immediately
+        if (!approved) {
+          try {
+            const approveTx = await contract.approveVoter(address, 0);
+            await approveTx.wait();
+          } catch (e) {
+            console.warn("Auto-approve failed (may already be approved):", e);
+          }
+        }
+
+        return NextResponse.json({ registered: true, approved: true });
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : "Registration failed";
         if (msg.includes("Already") || msg.includes("registered")) {

@@ -45,10 +45,18 @@ export async function POST(request: Request) {
         ipfsHashes.set(proposalId, { cid: pinResult.ipfsHash, url: pinResult.gatewayUrl! });
       }
 
+      // Auto-start voting so proposals are immediately active
+      try {
+        const startTx = await contract.startVoting(proposalId);
+        await startTx.wait();
+      } catch (e) {
+        console.warn("Auto-start voting failed (may already be started):", e);
+      }
+
       return NextResponse.json({
         proposalId,
         txHash: tx.hash,
-        status: "draft",
+        status: "active",
         ipfsHash: pinResult.ipfsHash,
         ipfsUrl: pinResult.gatewayUrl,
       });
@@ -73,10 +81,15 @@ export async function POST(request: Request) {
 
       const readContract = getReadContract();
 
-      // Check voter is approved
-      const [, approved] = await readContract.getVoterInfo(voterAddress);
+      // Auto-register + auto-approve if needed (seamless flow)
+      const [registered, approved] = await readContract.getVoterInfo(voterAddress);
+      if (!registered) {
+        const regTx = await contract.registerVoter(voterAddress);
+        await regTx.wait();
+      }
       if (!approved) {
-        return NextResponse.json({ error: "Not approved to vote. Admin must approve you first." }, { status: 403 });
+        const appTx = await contract.approveVoter(voterAddress, 0); // Newcomer
+        await appTx.wait();
       }
 
       // Check not already voted
