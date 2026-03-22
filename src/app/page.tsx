@@ -135,7 +135,7 @@ export default function Home() {
         ) : (
           <div className="flex items-center justify-center gap-4">
             <span className="tier-badge tier-newcomer">
-              🧠 {user?.wallet?.address?.slice(0, 8) + "..." || "Connected"}
+              🧠 {user?.wallet?.address ? `${user.wallet.address.slice(0, 8)}...` : "Connected"}
             </span>
 
             {walletAddress && (

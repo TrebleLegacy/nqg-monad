@@ -110,7 +110,7 @@ export default function CreateProposal() {
           </p>
           {result.txHash && (
             <a
-              href={`https://monadscan.com/tx/${result.txHash}`}
+              href={`https://testnet.monadscan.com/tx/${result.txHash}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm block"
