@@ -9,7 +9,7 @@ import { PinataSDK } from "pinata";
  *       ▼
  *  pinProposalToIPFS(data)
  *       │
- *       ├─ success → { ipfsHash: "Qm...", gatewayUrl: "https://..." }
+ *       ├─ success → { ipfsHash: "bafy...", gatewayUrl: "https://..." }
  *       │
  *       └─ failure → { ipfsHash: null, gatewayUrl: null }
  *                     (logged, never blocks proposal creation)
@@ -45,21 +45,23 @@ export interface ProposalPinData {
  * Pin proposal metadata to IPFS via Pinata.
  * Graceful: returns null on failure, never throws.
  */
-export async function pinProposalToIPFS(data: ProposalPinData): Promise<PinResult> {
+export async function pinProposalToIPFS(
+  data: ProposalPinData,
+): Promise<PinResult> {
   try {
     const sdk = getPinata();
     const gateway = process.env.NEXT_PUBLIC_PINATA_GATEWAY || "";
 
-    const result = await sdk.upload.json(data).addMetadata({
-      name: `nqg-proposal-${data.proposalId}`,
-    });
+    const result = await sdk.upload.public
+      .json(data)
+      .name(`nqg-proposal-${data.proposalId}`);
 
-    const ipfsHash = result.IpfsHash;
+    const cid = result.cid;
     const gatewayUrl = gateway
-      ? `https://${gateway}/ipfs/${ipfsHash}`
-      : `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
+      ? `https://${gateway}/ipfs/${cid}`
+      : `https://gateway.pinata.cloud/ipfs/${cid}`;
 
-    return { ipfsHash, gatewayUrl };
+    return { ipfsHash: cid, gatewayUrl };
   } catch (error) {
     console.error("[Pinata] Failed to pin proposal:", error);
     return { ipfsHash: null, gatewayUrl: null };

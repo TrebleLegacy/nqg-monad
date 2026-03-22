@@ -10,7 +10,13 @@ export default function CreateProposal() {
   const [options, setOptions] = useState(["", ""]);
   const [duration, setDuration] = useState(3600);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{ proposalId?: number; txHash?: string; error?: string } | null>(null);
+  const [result, setResult] = useState<{
+    proposalId?: number;
+    txHash?: string;
+    ipfsHash?: string | null;
+    ipfsUrl?: string | null;
+    error?: string;
+  } | null>(null);
 
   const walletAddress = wallets?.[0]?.address;
 
@@ -48,7 +54,12 @@ export default function CreateProposal() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setResult({ proposalId: data.proposalId, txHash: data.txHash });
+      setResult({
+        proposalId: data.proposalId,
+        txHash: data.txHash,
+        ipfsHash: data.ipfsHash,
+        ipfsUrl: data.ipfsUrl,
+      });
     } catch (e: unknown) {
       setResult({ error: e instanceof Error ? e.message : "Failed to create" });
     }
@@ -69,11 +80,27 @@ export default function CreateProposal() {
               href={`https://monadscan.com/tx/${result.txHash}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm"
+              className="text-sm block"
               style={{ color: "var(--accent-light)" }}
             >
               View on MonadScan ↗
             </a>
+          )}
+          {result.ipfsUrl && (
+            <a
+              href={result.ipfsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm block mt-2"
+              style={{ color: "var(--accent-light)" }}
+            >
+              📌 Pinned on IPFS ↗
+            </a>
+          )}
+          {result.ipfsHash && (
+            <p className="text-xs mt-1 font-mono" style={{ color: "var(--text-muted)", wordBreak: "break-all" }}>
+              CID: {result.ipfsHash}
+            </p>
           )}
           <div className="mt-6 flex gap-3 justify-center">
             <a href="/" className="btn-glow text-sm">← Back to Proposals</a>

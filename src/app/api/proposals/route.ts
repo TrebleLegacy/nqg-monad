@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { getContract, getReadContract } from "@/lib/contract";
+import { pinProposalToIPFS } from "@/lib/pinata";
+
+// In-memory IPFS hash store (proposalId → CID)
+// Survives HMR but not full restarts — acceptable for hackathon
+const ipfsHashes = new Map<number, { cid: string; url: string }>();
 
 // POST /api/proposals — create, start voting, or vote
 export async function POST(request: Request) {
@@ -25,7 +30,28 @@ export async function POST(request: Request) {
         proposalId = Number(count) - 1;
       } catch { /* fallback */ }
 
-      return NextResponse.json({ proposalId, txHash: tx.hash, status: "draft" });
+      // Pin proposal metadata to IPFS (fire-and-forget, never blocks)
+      const pinResult = await pinProposalToIPFS({
+        proposalId,
+        question,
+        options,
+        duration: durationSecs,
+        txHash: tx.hash,
+        creator: body.creatorAddress || "anonymous",
+        createdAt: new Date().toISOString(),
+      });
+
+      if (pinResult.ipfsHash) {
+        ipfsHashes.set(proposalId, { cid: pinResult.ipfsHash, url: pinResult.gatewayUrl! });
+      }
+
+      return NextResponse.json({
+        proposalId,
+        txHash: tx.hash,
+        status: "draft",
+        ipfsHash: pinResult.ipfsHash,
+        ipfsUrl: pinResult.gatewayUrl,
+      });
     }
 
     // Admin: start voting on a proposal
@@ -93,6 +119,7 @@ export async function GET() {
         const options = await contract.getProposalOptions(i);
         const results = await contract.getResults(i);
 
+        const ipfs = ipfsHashes.get(i);
         proposals.push({
           id: i,
           question,
@@ -102,6 +129,8 @@ export async function GET() {
           totalWeight: Number(totalWeight),
           active,
           started,
+          ipfsHash: ipfs?.cid || null,
+          ipfsUrl: ipfs?.url || null,
         });
       } catch {
         continue;
